@@ -15,9 +15,23 @@
  */
 package io.jsonwebtoken.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.*;
+import java.security.Key;
+import java.util.Date;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import javax.crypto.spec.SecretKeySpec;
+
+import com.eclipsesource.json.JsonObject;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.CompressionCodec;
+import io.jsonwebtoken.Header;
+import io.jsonwebtoken.JwsHeader;
+import io.jsonwebtoken.JwtBuilder;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.impl.crypto.DefaultJwtSigner;
 import io.jsonwebtoken.impl.crypto.JwtSigner;
 import io.jsonwebtoken.lang.Assert;
@@ -25,14 +39,9 @@ import io.jsonwebtoken.lang.Collections;
 import io.jsonwebtoken.lang.Objects;
 import io.jsonwebtoken.lang.Strings;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.security.Key;
-import java.util.Date;
-import java.util.Map;
-
 public class DefaultJwtBuilder implements JwtBuilder {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    //private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private Header header;
     private Claims claims;
@@ -301,7 +310,7 @@ public class DefaultJwtBuilder implements JwtBuilder {
             byte[] bytes;
             try {
                 bytes = this.payload != null ? payload.getBytes(Strings.UTF_8) : toJson(claims);
-            } catch (JsonProcessingException e) {
+            } catch (Exception e) {
                 throw new IllegalArgumentException("Unable to serialize claims object to json.");
             }
 
@@ -338,11 +347,11 @@ public class DefaultJwtBuilder implements JwtBuilder {
         return new DefaultJwtSigner(alg, key);
     }
 
-    protected String base64UrlEncode(Object o, String errMsg) {
+    protected String base64UrlEncode(Map<String,Object> o, String errMsg) {
         byte[] bytes;
         try {
             bytes = toJson(o);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             throw new IllegalStateException(errMsg, e);
         }
 
@@ -350,7 +359,17 @@ public class DefaultJwtBuilder implements JwtBuilder {
     }
 
 
-    protected byte[] toJson(Object object) throws  JsonProcessingException {
+    /*
+    protected byte[] toJson(Claims object) throws  JsonProcessingException {
         return OBJECT_MAPPER.writeValueAsBytes(object);
+    }
+    */
+    
+    protected byte [] toJson(Map<String,Object> map) {
+    	JsonObject json = new JsonObject();
+    	for (Entry<String, Object> entry: map.entrySet()) {
+    		json.add(entry.getKey(), (String)entry.getValue());
+    	}
+    	return json.toString().getBytes();
     }
 }
