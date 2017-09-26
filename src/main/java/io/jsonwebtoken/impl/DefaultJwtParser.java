@@ -16,6 +16,7 @@
 package io.jsonwebtoken.impl;
 
 import java.security.Key;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -25,6 +26,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import com.eclipsesource.json.Json;
 import com.eclipsesource.json.JsonObject;
+import com.eclipsesource.json.JsonValue;
 
 import io.jsonwebtoken.ClaimJwtException;
 import io.jsonwebtoken.Claims;
@@ -346,8 +348,9 @@ public class DefaultJwtParser implements JwtParser {
 				validator = createSignatureValidator(algorithm, key);
 			} catch (IllegalArgumentException e) {
 				String algName = algorithm.getValue();
-				String msg = "The parsed JWT indicates it was signed with the " + algName + " signature " + "algorithm, but the specified signing key of type " + key.getClass().getName() + " may not be used to validate " + algName + " signatures.  Because the specified "
-						+ "signing key reflects a specific and expected algorithm, and the JWT does not reflect " + "this algorithm, it is likely that the JWT was not expected and therefore should not be "
+				String msg = "The parsed JWT indicates it was signed with the " + algName + " signature " + "algorithm, but the specified signing key of type " + key.getClass().getName()
+						+ " may not be used to validate " + algName + " signatures.  Because the specified " + "signing key reflects a specific and expected algorithm, and the JWT does not reflect "
+						+ "this algorithm, it is likely that the JWT was not expected and therefore should not be "
 						+ "trusted.  Another possibility is that the parser was configured with the incorrect " + "signing key, but this cannot be assumed for security reasons.";
 				throw new UnsupportedJwtException(msg, e);
 			}
@@ -382,7 +385,8 @@ public class DefaultJwtParser implements JwtParser {
 
 					long differenceMillis = maxTime - exp.getTime();
 
-					String msg = "JWT expired at " + expVal + ". Current time: " + nowVal + ", a difference of " + differenceMillis + " milliseconds.  Allowed clock skew: " + this.allowedClockSkewMillis + " milliseconds.";
+					String msg = "JWT expired at " + expVal + ". Current time: " + nowVal + ", a difference of " + differenceMillis + " milliseconds.  Allowed clock skew: "
+							+ this.allowedClockSkewMillis + " milliseconds.";
 					throw new ExpiredJwtException(header, claims, msg);
 				}
 			}
@@ -401,7 +405,8 @@ public class DefaultJwtParser implements JwtParser {
 
 					long differenceMillis = nbf.getTime() - minTime;
 
-					String msg = "JWT must not be accepted before " + nbfVal + ". Current time: " + nowVal + ", a difference of " + differenceMillis + " milliseconds.  Allowed clock skew: " + this.allowedClockSkewMillis + " milliseconds.";
+					String msg = "JWT must not be accepted before " + nbfVal + ". Current time: " + nowVal + ", a difference of " + differenceMillis + " milliseconds.  Allowed clock skew: "
+							+ this.allowedClockSkewMillis + " milliseconds.";
 					throw new PrematureJwtException(header, claims, msg);
 				}
 			}
@@ -534,11 +539,63 @@ public class DefaultJwtParser implements JwtParser {
 		try {
 			JsonObject object = Json.parse(val).asObject();
 			for (String key : object.names()) {
-				map.put(key, object.get(key));
+				map.put(key, extractCorrectValue(object.get(key)));
 			}
 		} catch (Exception e) {
 			throw new MalformedJwtException("Unable to read JSON value: " + val, e);
 		}
 		return map;
 	}
+
+	private Object extractCorrectValue(JsonValue jsv) throws ParseException {
+		if (jsv.isBoolean()) {
+			return jsv.asBoolean();
+		}
+		if (jsv.isString()) {
+			if (maybeISO8601Date(jsv.asString())) {
+				return parseDate(jsv.asString());
+			}
+			
+			return jsv.asString();
+		}
+		if (jsv.isNumber()) {
+			if (jsv.toString().contains(".")) {
+				return jsv.asDouble();
+			} else {
+				try {
+					return jsv.asInt();
+				} catch(Exception e) {
+					return jsv.asLong();
+				}
+			}
+		}
+		return jsv.asString();
+	}
+	protected Date parseDate(final String input) throws java.text.ParseException {
+
+		String toParse = input;
+		SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz");
+
+		// this is zero time so we need to add that TZ indicator for
+		if (toParse.endsWith("Z")) {
+			toParse = toParse.substring(0, input.length() - 1) + "GMT-00:00";
+		} else {
+			int inset = 6;
+
+			String s0 = toParse.substring(0, toParse.length() - inset);
+			String s1 = toParse.substring(toParse.length() - inset, toParse.length());
+
+			toParse = s0 + "GMT" + s1;
+		}
+		return df.parse(toParse);
+	}
+	
+	public static boolean maybeISO8601Date(String value) {
+		return value.length()>=19 
+				&& value.charAt(4)=='-' 
+				&& value.charAt(7)=='-' 
+				&& value.charAt(10)=='T' 
+				&& value.charAt(13)==':' 
+				&& value.charAt(16)==':';
+}
 }

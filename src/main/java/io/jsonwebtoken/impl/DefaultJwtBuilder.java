@@ -16,9 +16,11 @@
 package io.jsonwebtoken.impl;
 
 import java.security.Key;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TimeZone;
 
 import javax.crypto.spec.SecretKeySpec;
 
@@ -368,8 +370,61 @@ public class DefaultJwtBuilder implements JwtBuilder {
     protected byte [] toJson(Map<String,Object> map) {
     	JsonObject json = new JsonObject();
     	for (Entry<String, Object> entry: map.entrySet()) {
-    		json.add(entry.getKey(), (String)entry.getValue());
+    		processValue(json, entry);
     	}
     	return json.toString().getBytes();
     }
+    
+    private void processValue(JsonObject json, Entry<String,Object> entry) {
+    	if (entry.getValue() instanceof Integer) {
+    		int value = (Integer) entry.getValue();
+    		json.add(entry.getKey(), value);
+    	}
+    	if (entry.getValue() instanceof String) {
+    		String value = (String) entry.getValue();
+    		json.add(entry.getKey(), value);
+    	}
+    	if (entry.getValue() instanceof Boolean) {
+    		boolean value = (Boolean) entry.getValue();
+    		json.add(entry.getKey(), value);
+    	}
+    	if (entry.getValue() instanceof Float) {
+    		float value = (Float) entry.getValue();
+    		json.add(entry.getKey(), value);
+    	}
+    	if (entry.getValue() instanceof Long) {
+    		long value = (Long) entry.getValue();
+    		json.add(entry.getKey(), value);
+    	}
+    	if (entry.getValue() instanceof Double) {
+    		double value = (Double) entry.getValue();
+    		json.add(entry.getKey(), value);
+    	}
+    	
+    	if (entry.getValue() instanceof Short) {
+    		int value = ((Short) entry.getValue()).intValue();
+    		json.add(entry.getKey(), value);
+    	}
+    	if (entry.getValue() instanceof Byte) {
+    		int value = ((Byte) entry.getValue()).intValue();
+    		json.add(entry.getKey(), value);
+    	}
+
+    	if (entry.getValue() instanceof Date) {
+    		String dt = buildISO8601Date((Date)entry.getValue());
+    		json.add(entry.getKey(), dt);
+    	}
+    }
+    
+    protected String buildISO8601Date(final Date javaDate) {
+		SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSz");
+
+		TimeZone tz = TimeZone.getTimeZone("UTC");
+
+		df.setTimeZone(tz);
+
+		String output = df.format(javaDate);
+		String result = output.replaceAll("UTC", "+00:00");
+		return result;
+	}
 }
